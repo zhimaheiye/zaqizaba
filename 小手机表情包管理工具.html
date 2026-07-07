@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>表情包管理工具</title>
+  <style>
+    :root {
+      --bg: #f5f5f7;
+      --surface: #ffffff;
+      --surface2: #ebebed;
+      --text: #1d1d1f;
+      --text2: #6e6e73;
+      --accent: #0071e3;
+      --accent-hover: #0077ed;
+      --danger: #ff3b30;
+      --border: #d2d2d7;
+      --shadow: 0 2px 12px rgba(0,0,0,0.08);
+      --radius: 12px;
+      --selected: #0071e3;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1c1c1e;
+        --surface: #2c2c2e;
+        --surface2: #3a3a3c;
+        --text: #f5f5f7;
+        --text2: #98989d;
+        --accent: #0a84ff;
+        --accent-hover: #409cff;
+        --danger: #ff453a;
+        --border: #48484a;
+        --shadow: 0 2px 12px rgba(0,0,0,0.4);
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    .app { max-width: 1200px; margin: 0 auto; padding: 16px; }
+    header {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+      margin-bottom: 16px;
+    }
+    header h1 { font-size: 1.4rem; font-weight: 700; margin-right: auto; }
+    .search-box {
+      flex: 1; min-width: 160px; max-width: 280px;
+      padding: 8px 12px; border: 1px solid var(--border);
+      border-radius: 8px; background: var(--surface); color: var(--text);
+      font-size: 14px; outline: none;
+    }
+    .search-box:focus { border-color: var(--accent); }
+    .btn {
+      padding: 8px 16px; border: none; border-radius: 8px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      background: var(--surface2); color: var(--text);
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-sm { padding: 5px 10px; font-size: 13px; }
+    .toolbar {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+      padding: 12px 16px; background: var(--surface);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+      margin-bottom: 16px;
+    }
+    .toolbar label { display: flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer; }
+    .toolbar select {
+      padding: 6px 10px; border: 1px solid var(--border);
+      border-radius: 6px; background: var(--surface); color: var(--text);
+      font-size: 13px; max-width: 220px;
+    }
+    .count { font-size: 13px; color: var(--text2); margin-left: auto; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 12px;
+    }
+    .sticker-card {
+      position: relative; background: var(--surface);
+      border: 2px solid transparent; border-radius: var(--radius);
+      overflow: hidden; cursor: pointer; box-shadow: var(--shadow);
+      transition: transform 0.15s, border-color 0.15s;
+      user-select: none;
+    }
+    .sticker-card:hover { transform: scale(1.03); }
+    .sticker-card.selected { border-color: var(--selected); }
+    .sticker-card .label {
+      padding: 6px 8px; font-size: 12px; font-weight: 600;
+      text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      background: var(--surface2);
+    }
+    .sticker-card .img-wrap {
+      height: 90px; display: flex; align-items: center; justify-content: center;
+      padding: 6px; background: var(--bg);
+    }
+    .sticker-card img {
+      max-width: 100%; max-height: 100%; object-fit: contain;
+    }
+    .sticker-card .placeholder {
+      font-size: 28px; color: var(--text2); opacity: 0.5;
+    }
+    .sticker-card .check {
+      position: absolute; top: 6px; right: 6px;
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--selected); color: #fff;
+      display: none; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700;
+    }
+    .sticker-card.selected .check { display: flex; }
+    .empty-state {
+      text-align: center; padding: 60px 20px; color: var(--text2);
+    }
+    .empty-state p { margin-top: 8px; font-size: 14px; }
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      display: none; align-items: center; justify-content: center;
+      z-index: 100; padding: 16px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface); border-radius: var(--radius);
+      width: 100%; max-width: 560px; max-height: 90vh;
+      display: flex; flex-direction: column; box-shadow: var(--shadow);
+    }
+    .modal.wide { max-width: 720px; }
+    .modal-header {
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .modal-header h2 { font-size: 1.1rem; }
+    .modal-close {
+      background: none; border: none; font-size: 22px;
+      cursor: pointer; color: var(--text2); line-height: 1;
+    }
+    .modal-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
+    .modal-footer {
+      padding: 12px 20px; border-top: 1px solid var(--border);
+      display: flex; gap: 8px; justify-content: flex-end;
+    }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+    .form-group select, .form-group input, .form-group textarea {
+      width: 100%; padding: 8px 12px; border: 1px solid var(--border);
+      border-radius: 8px; background: var(--bg); color: var(--text);
+      font-size: 14px; font-family: inherit; outline: none;
+    }
+    .form-group textarea { min-height: 160px; resize: vertical; line-height: 1.6; }
+    .form-hint { font-size: 12px; color: var(--text2); margin-top: 4px; }
+    .preview-box {
+      margin-top: 10px; padding: 10px 12px; background: var(--bg);
+      border-radius: 8px; font-size: 13px; font-family: monospace;
+      word-break: break-all; min-height: 40px;
+    }
+    .preview-box .ok { color: #34c759; }
+    .preview-box .err { color: var(--danger); }
+    .preset-list { display: flex; flex-direction: column; gap: 8px; }
+    .preset-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; background: var(--bg); border-radius: 8px;
+      font-size: 13px;
+    }
+    .preset-item .info { flex: 1; min-width: 0; }
+    .preset-item .name { font-weight: 600; }
+    .preset-item .tpl { color: var(--text2); font-family: monospace; font-size: 12px; }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-size: 11px; font-weight: 600; background: var(--surface2);
+    }
+    .badge-import { color: #34c759; }
+    .badge-export { color: var(--accent); }
+    .badge-both { color: #bf5af2; }
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+      background: var(--text); color: var(--bg);
+      padding: 10px 24px; border-radius: 24px; font-size: 14px;
+      z-index: 200; transition: transform 0.3s; pointer-events: none;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    @media (max-width: 600px) {
+      header h1 { width: 100%; }
+      .count { margin-left: 0; width: 100%; }
+      .grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>表情包管理工具</h1>
+      <input type="search" class="search-box" id="searchInput" placeholder="搜索标签…">
+      <button class="btn btn-primary" id="importBtn">导入</button>
+      <button class="btn" id="presetBtn">管理预设</button>
+      <button class="btn btn-danger btn-sm" id="clearBtn">清空全部</button>
+    </header>
+
+    <div class="toolbar">
+      <label><input type="checkbox" id="selectAllCb"> 全选</label>
+      <button class="btn btn-sm" id="invertBtn">反选</button>
+      <label>导出预设</label>
+      <select id="exportPresetSelect"></select>
+      <button class="btn btn-primary btn-sm" id="exportBtn">复制导出</button>
+      <button class="btn btn-danger btn-sm" id="deleteBtn">删除选中</button>
+      <span class="count" id="countLabel">已选 0 / 共 0</span>
+    </div>
+
+    <div class="grid" id="grid"></div>
+    <div class="empty-state" id="emptyState" style="display:none">
+      <div style="font-size:48px">📦</div>
+      <p>还没有表情包，点击「导入」粘贴你的文本吧</p>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="importModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>导入表情包</h2>
+        <button class="modal-close" data-close="importModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>导入预设</label>
+          <select id="importPresetSelect"></select>
+          <div class="form-hint">选择与你粘贴文本格式匹配的预设。模板中 {name} 是文字描述，{url} 是链接，{code} 是图床短码。</div>
+        </div>
+        <div class="form-group">
+          <label>粘贴文本（一行一个）</label>
+          <textarea id="importText" placeholder="每行粘贴一条，格式需与上方预设一致"></textarea>
+        </div>
+        <div class="form-group">
+          <label>预览（第一行）</label>
+          <div class="preview-box" id="importPreview">粘贴内容后自动预览</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" data-close="importModal">取消</button>
+        <button class="btn btn-primary" id="doImportBtn">解析导入</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="presetModal">
+    <div class="modal wide">
+      <div class="modal-header">
+        <h2>管理预设</h2>
+        <button class="modal-close" data-close="presetModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="preset-list" id="presetList"></div>
+        <hr style="margin:16px 0;border:none;border-top:1px solid var(--border)">
+        <h3 style="font-size:14px;margin-bottom:12px" id="presetFormTitle">新增预设</h3>
+        <div class="form-group">
+          <label>预设名称</label>
+          <input type="text" id="presetName" placeholder="如：我的文档格式">
+        </div>
+        <div class="form-group">
+          <label>模板</label>
+          <input type="text" id="presetTemplate" placeholder="{name}：{url}">
+          <div class="form-hint">可用变量：{name} 文字描述 · {url} 完整链接 · {code} 图床短码（如 2a9wte.jpeg）</div>
+        </div>
+        <div class="form-group">
+          <label>用途</label>
+          <select id="presetDirection">
+            <option value="both">通用（导入 + 导出）</option>
+            <option value="import">仅导入</option>
+            <option value="export">仅导出</option>
+          </select>
+        </div>
+        <div class="form-group" id="urlPrefixGroup" style="display:none">
+          <label>URL 前缀（{code} 导入时补全）</label>
+          <input type="text" id="presetUrlPrefix" value="https://files.catbox.moe/">
+        </div>
+        <div class="form-group">
+          <label>预览样例</label>
+          <input type="text" id="presetSample" placeholder="我是败犬：https://example.com/a.jpg">
+          <div class="preview-box" id="presetPreview">输入模板和样例后自动预览</div>
+        </div>
+        <input type="hidden" id="presetEditId">
+      </div>
+      <div class="modal-footer">
+        <button class="btn" id="resetPresetFormBtn">重置表单</button>
+        <button class="btn btn-primary" id="savePresetBtn">保存预设</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+  (function () {
+    'use strict';
+
+    const KEYS = {
+      items: 'sticker-tool-items',
+      presets: 'sticker-tool-presets',
+      importPreset: 'sticker-tool-import-preset',
+      exportPreset: 'sticker-tool-export-preset',
+    };
+
+    const DEFAULT_PRESETS = [
+      { id: 'builtin-colon', name: '描述：URL（中文冒号）', template: '{name}：{url}', direction: 'both', urlPrefix: 'https://files.catbox.moe/', builtin: true },
+      { id: 'builtin-space', name: '描述 空格 URL', template: '{name} {url}', direction: 'both', urlPrefix: 'https://files.catbox.moe/', builtin: true },
+      { id: 'builtin-comma', name: '描述，URL（中文逗号）', template: '{name}，{url}', direction: 'both', urlPrefix: 'https://files.catbox.moe/', builtin: true },
+      { id: 'builtin-catbox', name: 'Catbox 简写', template: '{name} {code}', direction: 'both', urlPrefix: 'https://files.catbox.moe/', builtin: true },
+      { id: 'builtin-eve', name: 'EVE小手机', template: '{name}：{url}', direction: 'export', urlPrefix: 'https://files.catbox.moe/', builtin: true },
+      { id: 'builtin-nuomi', name: '手抓糯米机', template: '{name}--{url}', direction: 'both', urlPrefix: 'https://files.catbox.moe/', builtin: true },
+    ];
+
+    let items = [];
+    let presets = [];
+    let selectedIds = new Set();
+    let searchQuery = '';
+
+    function loadItems() {
+      try { return JSON.parse(localStorage.getItem(KEYS.items)) || []; }
+      catch { return []; }
+    }
+    function saveItems() {
+      localStorage.setItem(KEYS.items, JSON.stringify(items));
+    }
+    function loadPresets() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(KEYS.presets)) || [];
+        const custom = saved.filter(p => !p.builtin && !DEFAULT_PRESETS.some(d => d.id === p.id));
+        const merged = DEFAULT_PRESETS.map(dp => {
+          const existing = saved.find(p => p.id === dp.id);
+          return existing ? { ...existing, name: dp.name, template: dp.template, direction: dp.direction, urlPrefix: dp.urlPrefix, builtin: true } : { ...dp };
+        });
+        return [...merged, ...custom];
+      } catch { return DEFAULT_PRESETS.map(p => ({ ...p })); }
+    }
+    function savePresets() {
+      localStorage.setItem(KEYS.presets, JSON.stringify(presets));
+    }
+
+    function escapeRegex(s) {
+      return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function templateToRegex(template) {
+      const placeholders = [];
+      let pattern = '^';
+      let cursor = 0;
+      const re = /\{(name|url|code)\}/g;
+      let m;
+      while ((m = re.exec(template)) !== null) {
+        if (m.index > cursor) pattern += escapeRegex(template.slice(cursor, m.index));
+        if (m[1] === 'name') { pattern += '(.+?)'; placeholders.push('name'); }
+        else if (m[1] === 'url') { pattern += '(https?:\\/\\/.+)'; placeholders.push('url'); }
+        else if (m[1] === 'code') { pattern += '([a-zA-Z0-9]+\\..+)'; placeholders.push('code'); }
+        cursor = m.index + m[0].length;
+      }
+      if (cursor < template.length) pattern += escapeRegex(template.slice(cursor));
+      pattern += '$';
+      return { regex: new RegExp(pattern), placeholders };
+    }
+
+    function extractCode(url) {
+      if (!url) return '';
+      const m = url.match(/\/([^/]+)$/);
+      return m ? m[1] : url;
+    }
+
+    function applyTemplate(template, item) {
+      const code = extractCode(item.url);
+      return template
+        .replace(/\{name\}/g, item.name)
+        .replace(/\{url\}/g, item.url)
+        .replace(/\{code\}/g, code);
+    }
+
+    function parseLine(line, preset) {
+      const trimmed = line.trim();
+      if (!trimmed) return null;
+      const { regex, placeholders } = templateToRegex(preset.template);
+      const match = trimmed.match(regex);
+      if (!match) return null;
+
+      const fields = {};
+      placeholders.forEach((p, i) => { fields[p] = match[i + 1].trim(); });
+
+      let url = fields.url || '';
+      if (fields.code && !fields.url) {
+        url = (preset.urlPrefix || 'https://files.catbox.moe/') + fields.code;
+      }
+      if (!fields.name || !url) return null;
+      if (!/^https?:\/\//.test(url)) return null;
+
+      return { name: fields.name, url };
+    }
+
+    function parseText(text, preset) {
+      const lines = text.split('\n');
+      const results = [];
+      let skipped = 0;
+      for (const line of lines) {
+        const parsed = parseLine(line, preset);
+        if (parsed) {
+          results.push({ id: 's_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8), ...parsed });
+        } else if (line.trim()) {
+          skipped++;
+        }
+      }
+      return { results, skipped };
+    }
+
+    function getPreset(id) { return presets.find(p => p.id === id); }
+    function importPresets() { return presets.filter(p => p.direction === 'import' || p.direction === 'both'); }
+    function exportPresets() { return presets.filter(p => p.direction === 'export' || p.direction === 'both'); }
+    function directionLabel(d) {
+      return d === 'both' ? '通用' : d === 'import' ? '仅导入' : '仅导出';
+    }
+    function directionBadgeClass(d) {
+      return d === 'both' ? 'badge-both' : d === 'import' ? 'badge-import' : 'badge-export';
+    }
+
+    function toast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(el._timer);
+      el._timer = setTimeout(() => el.classList.remove('show'), 2500);
+    }
+
+    function openModal(id) { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+    function filteredItems() {
+      if (!searchQuery) return items;
+      const q = searchQuery.toLowerCase();
+      return items.filter(it => it.name.toLowerCase().includes(q));
+    }
+
+    function escHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function escAttr(s) { return escHtml(s); }
+
+    function renderGrid() {
+      const grid = document.getElementById('grid');
+      const empty = document.getElementById('emptyState');
+      const list = filteredItems();
+
+      if (!items.length) {
+        grid.innerHTML = '';
+        empty.style.display = 'block';
+        updateCount();
+        return;
+      }
+      empty.style.display = list.length ? 'none' : 'block';
+
+      grid.innerHTML = list.map(it => {
+        const sel = selectedIds.has(it.id) ? ' selected' : '';
+        return `<div class="sticker-card${sel}" data-id="${it.id}">
+          <div class="check">✓</div>
+          <div class="label" title="${escHtml(it.name)}">${escHtml(it.name)}</div>
+          <div class="img-wrap">
+            <img src="${escAttr(it.url)}" alt="${escAttr(it.name)}" loading="lazy"
+              onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+            <div class="placeholder" style="display:none">🖼</div>
+          </div>
+        </div>`;
+      }).join('');
+
+      updateCount();
+    }
+
+    function updateCount() {
+      const total = filteredItems().length;
+      const sel = [...selectedIds].filter(id => filteredItems().some(it => it.id === id)).length;
+      document.getElementById('countLabel').textContent = `已选 ${sel} / 共 ${total}`;
+      const allVisible = filteredItems();
+      const allSelected = allVisible.length > 0 && allVisible.every(it => selectedIds.has(it.id));
+      document.getElementById('selectAllCb').checked = allSelected;
+    }
+
+    function fillPresetSelects() {
+      const impSel = document.getElementById('importPresetSelect');
+      const expSel = document.getElementById('exportPresetSelect');
+      const impList = importPresets();
+      const expList = exportPresets();
+
+      impSel.innerHTML = impList.map(p =>
+        `<option value="${p.id}">${escHtml(p.name)} (${escHtml(p.template)})</option>`
+      ).join('');
+      expSel.innerHTML = expList.map(p =>
+        `<option value="${p.id}">${escHtml(p.name)} (${escHtml(p.template)})</option>`
+      ).join('');
+
+      const savedImp = localStorage.getItem(KEYS.importPreset);
+      const savedExp = localStorage.getItem(KEYS.exportPreset);
+      if (savedImp && impList.some(p => p.id === savedImp)) impSel.value = savedImp;
+      if (savedExp && expList.some(p => p.id === savedExp)) expSel.value = savedExp;
+    }
+
+    function renderPresetList() {
+      const el = document.getElementById('presetList');
+      el.innerHTML = presets.map(p => `
+        <div class="preset-item">
+          <div class="info">
+            <div class="name">${escHtml(p.name)} ${p.builtin ? '<span class="badge">内置</span>' : ''}</div>
+            <div class="tpl">${escHtml(p.template)}</div>
+          </div>
+          <span class="badge ${directionBadgeClass(p.direction)}">${directionLabel(p.direction)}</span>
+          <button class="btn btn-sm" data-edit-preset="${p.id}">编辑</button>
+          ${p.builtin ? '' : `<button class="btn btn-sm btn-danger" data-del-preset="${p.id}">删除</button>`}
+        </div>
+      `).join('');
+    }
+
+    function updateImportPreview() {
+      const text = document.getElementById('importText').value;
+      const presetId = document.getElementById('importPresetSelect').value;
+      const preset = getPreset(presetId);
+      const box = document.getElementById('importPreview');
+      if (!text.trim() || !preset) { box.textContent = '粘贴内容后自动预览'; return; }
+      const firstLine = text.split('\n').find(l => l.trim());
+      if (!firstLine) { box.textContent = '无有效行'; return; }
+      const parsed = parseLine(firstLine, preset);
+      if (parsed) {
+        box.innerHTML = `<span class="ok">✓ 解析成功</span><br>描述：${escHtml(parsed.name)}<br>URL：${escHtml(parsed.url)}`;
+      } else {
+        box.innerHTML = `<span class="err">✗ 无法解析</span><br>请检查预设模板是否与文本格式匹配<br>原文：${escHtml(firstLine)}`;
+      }
+    }
+
+    function updatePresetPreview() {
+      const template = document.getElementById('presetTemplate').value;
+      const sample = document.getElementById('presetSample').value;
+      const box = document.getElementById('presetPreview');
+      const urlPrefix = document.getElementById('presetUrlPrefix').value;
+
+      document.getElementById('urlPrefixGroup').style.display =
+        template.includes('{code}') ? 'block' : 'none';
+
+      if (!template) { box.textContent = '输入模板和样例后自动预览'; return; }
+
+      if (sample.trim()) {
+        const preset = { template, urlPrefix };
+        const parsed = parseLine(sample, preset);
+        if (parsed) {
+          box.innerHTML = `<span class="ok">导入预览</span> → 描述：${escHtml(parsed.name)} · URL：${escHtml(parsed.url)}<br>`
+            + `<span class="ok">导出预览</span> → ${escHtml(applyTemplate(template, parsed))}`;
+        } else {
+          box.innerHTML = `<span class="err">导入：无法解析样例</span><br>`
+            + `<span class="ok">导出预览</span> → ${escHtml(applyTemplate(template, { name: '示例', url: 'https://example.com/a.gif' }))}`;
+        }
+      } else {
+        box.innerHTML = `<span class="ok">导出预览</span> → ${escHtml(applyTemplate(template, { name: '示例', url: 'https://example.com/a.gif' }))}`;
+      }
+    }
+
+    function resetPresetForm() {
+      document.getElementById('presetFormTitle').textContent = '新增预设';
+      document.getElementById('presetEditId').value = '';
+      document.getElementById('presetName').value = '';
+      document.getElementById('presetTemplate').value = '';
+      document.getElementById('presetDirection').value = 'both';
+      document.getElementById('presetUrlPrefix').value = 'https://files.catbox.moe/';
+      document.getElementById('presetSample').value = '';
+      updatePresetPreview();
+    }
+
+    document.getElementById('importBtn').addEventListener('click', () => {
+      fillPresetSelects();
+      updateImportPreview();
+      openModal('importModal');
+    });
+
+    document.getElementById('presetBtn').addEventListener('click', () => {
+      renderPresetList();
+      resetPresetForm();
+      openModal('presetModal');
+    });
+
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      if (!confirm('确定清空所有表情包？此操作不可撤销。')) return;
+      items = [];
+      selectedIds.clear();
+      saveItems();
+      renderGrid();
+      toast('已清空全部表情包');
+    });
+
+    document.getElementById('doImportBtn').addEventListener('click', () => {
+      const text = document.getElementById('importText').value;
+      const presetId = document.getElementById('importPresetSelect').value;
+      const preset = getPreset(presetId);
+      if (!text.trim()) { toast('请先粘贴文本'); return; }
+      const { results, skipped } = parseText(text, preset);
+      if (!results.length) {
+        toast('没有成功解析的行，请检查格式和预设');
+        return;
+      }
+      items.push(...results);
+      saveItems();
+      localStorage.setItem(KEYS.importPreset, presetId);
+      closeModal('importModal');
+      document.getElementById('importText').value = '';
+      renderGrid();
+      toast(`导入成功 ${results.length} 条${skipped ? '，跳过 ' + skipped + ' 行' : ''}`);
+    });
+
+    document.getElementById('exportBtn').addEventListener('click', async () => {
+      const presetId = document.getElementById('exportPresetSelect').value;
+      const preset = getPreset(presetId);
+      const selected = items.filter(it => selectedIds.has(it.id));
+      if (!selected.length) { toast('请先选择要导出的表情包'); return; }
+      const text = selected.map(it => applyTemplate(preset.template, it)).join('\n');
+      try {
+        await navigator.clipboard.writeText(text);
+        localStorage.setItem(KEYS.exportPreset, presetId);
+        toast(`已复制 ${selected.length} 条到剪贴板`);
+      } catch {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        toast(`已复制 ${selected.length} 条到剪贴板`);
+      }
+    });
+
+    document.getElementById('deleteBtn').addEventListener('click', () => {
+      if (!selectedIds.size) { toast('请先选择要删除的表情包'); return; }
+      if (!confirm(`确定删除选中的 ${selectedIds.size} 个表情包？`)) return;
+      items = items.filter(it => !selectedIds.has(it.id));
+      selectedIds.clear();
+      saveItems();
+      renderGrid();
+      toast('已删除选中项');
+    });
+
+    document.getElementById('selectAllCb').addEventListener('change', (e) => {
+      const list = filteredItems();
+      if (e.target.checked) list.forEach(it => selectedIds.add(it.id));
+      else list.forEach(it => selectedIds.delete(it.id));
+      renderGrid();
+    });
+
+    document.getElementById('invertBtn').addEventListener('click', () => {
+      filteredItems().forEach(it => {
+        if (selectedIds.has(it.id)) selectedIds.delete(it.id);
+        else selectedIds.add(it.id);
+      });
+      renderGrid();
+    });
+
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      searchQuery = e.target.value.trim();
+      renderGrid();
+    });
+
+    document.getElementById('importText').addEventListener('input', updateImportPreview);
+    document.getElementById('importPresetSelect').addEventListener('change', updateImportPreview);
+    document.getElementById('presetTemplate').addEventListener('input', updatePresetPreview);
+    document.getElementById('presetSample').addEventListener('input', updatePresetPreview);
+    document.getElementById('presetUrlPrefix').addEventListener('input', updatePresetPreview);
+
+    document.getElementById('savePresetBtn').addEventListener('click', () => {
+      const name = document.getElementById('presetName').value.trim();
+      const template = document.getElementById('presetTemplate').value.trim();
+      const direction = document.getElementById('presetDirection').value;
+      const urlPrefix = document.getElementById('presetUrlPrefix').value.trim() || 'https://files.catbox.moe/';
+      const editId = document.getElementById('presetEditId').value;
+
+      if (!name || !template) { toast('请填写名称和模板'); return; }
+      if (!/\{(name|url|code)\}/.test(template)) { toast('模板需包含 {name}、{url} 或 {code}'); return; }
+
+      if (editId) {
+        const p = getPreset(editId);
+        if (p) { p.name = name; p.template = template; p.direction = direction; p.urlPrefix = urlPrefix; }
+      } else {
+        presets.push({ id: 'custom_' + Date.now(), name, template, direction, urlPrefix, builtin: false });
+      }
+      savePresets();
+      fillPresetSelects();
+      renderPresetList();
+      resetPresetForm();
+      toast(editId ? '预设已更新' : '预设已添加');
+    });
+
+    document.getElementById('resetPresetFormBtn').addEventListener('click', resetPresetForm);
+
+    document.getElementById('presetList').addEventListener('click', (e) => {
+      const editId = e.target.dataset.editPreset;
+      const delId = e.target.dataset.delPreset;
+      if (editId) {
+        const p = getPreset(editId);
+        if (!p) return;
+        document.getElementById('presetFormTitle').textContent = p.builtin ? '编辑内置预设' : '编辑预设';
+        document.getElementById('presetEditId').value = p.id;
+        document.getElementById('presetName').value = p.name;
+        document.getElementById('presetTemplate').value = p.template;
+        document.getElementById('presetDirection').value = p.direction;
+        document.getElementById('presetUrlPrefix').value = p.urlPrefix || 'https://files.catbox.moe/';
+        updatePresetPreview();
+      }
+      if (delId) {
+        if (!confirm('确定删除此预设？')) return;
+        presets = presets.filter(p => p.id !== delId);
+        savePresets();
+        fillPresetSelects();
+        renderPresetList();
+        toast('预设已删除');
+      }
+    });
+
+    document.getElementById('grid').addEventListener('click', (e) => {
+      const card = e.target.closest('.sticker-card');
+      if (!card) return;
+      const id = card.dataset.id;
+      if (selectedIds.has(id)) selectedIds.delete(id);
+      else selectedIds.add(id);
+      renderGrid();
+    });
+
+    document.querySelectorAll('[data-close]').forEach(btn => {
+      btn.addEventListener('click', () => closeModal(btn.dataset.close));
+    });
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) closeModal(overlay.id);
+      });
+    });
+
+    items = loadItems();
+    presets = loadPresets();
+    fillPresetSelects();
+    renderGrid();
+  })();
+  </script>
+</body>
+</html>
