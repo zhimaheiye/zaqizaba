@@ -1,0 +1,262 @@
+{
+  "LimitSingleInstance": true,
+  "SummaryExpression": "$$",
+  "SubPrograms": [],
+  "Variables": [
+    {
+      "Key": "text",
+      "IsLocked": false,
+      "Type": 0,
+      "Desc": "默认的文本变量",
+      "DefaultValue": "",
+      "SaveState": false,
+      "IsInput": false,
+      "IsOutput": false,
+      "ParamName": null,
+      "InputParamInfo": null,
+      "OutputParamInfo": null,
+      "TableDef": null,
+      "CustomType": null,
+      "Group": null
+    },
+    {
+      "Key": "sourceHwnd",
+      "IsLocked": false,
+      "Type": 12,
+      "Desc": "",
+      "DefaultValue": "",
+      "SaveState": false,
+      "IsInput": false,
+      "IsOutput": false,
+      "ParamName": "",
+      "InputParamInfo": null,
+      "OutputParamInfo": null,
+      "TableDef": null,
+      "CustomType": null,
+      "Group": ""
+    },
+    {
+      "Key": "geminiHwnd",
+      "IsLocked": false,
+      "Type": 12,
+      "Desc": "",
+      "DefaultValue": "",
+      "SaveState": false,
+      "IsInput": false,
+      "IsOutput": false,
+      "ParamName": "",
+      "InputParamInfo": null,
+      "OutputParamInfo": null,
+      "TableDef": null,
+      "CustomType": null,
+      "Group": ""
+    },
+    {
+      "Key": "transcript",
+      "IsLocked": false,
+      "Type": 0,
+      "Desc": "",
+      "DefaultValue": "",
+      "SaveState": false,
+      "IsInput": false,
+      "IsOutput": false,
+      "ParamName": "",
+      "InputParamInfo": null,
+      "OutputParamInfo": null,
+      "TableDef": null,
+      "CustomType": null,
+      "Group": ""
+    }
+  ],
+  "Steps": [
+    {
+      "StepRunnerKey": "sys:getWindowTitle",
+      "InputParams": {
+        "which": {
+          "VarKey": null,
+          "Value": "foreground"
+        },
+        "winRectIncludeInvisibleBorder": {
+          "VarKey": null,
+          "Value": "0"
+        },
+        "stopIfFail": {
+          "VarKey": null,
+          "Value": "1"
+        }
+      },
+      "OutputParams": {
+        "isSuccess": null,
+        "output": null,
+        "className": null,
+        "handle": "sourceHwnd",
+        "pid": null,
+        "procName": null,
+        "path": null,
+        "parent": null,
+        "root": null,
+        "rootOwner": null,
+        "rect": null,
+        "rectNoSize": null,
+        "rectDict": null,
+        "isTopmost": null,
+        "isVisible": null,
+        "showState": null,
+        "alpha": null,
+        "borderColor": null,
+        "allChildWindows": null,
+        "errMessage": null
+      },
+      "IfSteps": null,
+      "ElseSteps": null,
+      "Note": "",
+      "Disabled": false,
+      "Collapsed": false,
+      "DelayMs": 0
+    },
+    {
+      "StepRunnerKey": "sys:getWindowTitle",
+      "InputParams": {
+        "which": {
+          "VarKey": null,
+          "Value": "findWindow"
+        },
+        "className": {
+          "VarKey": null,
+          "Value": ""
+        },
+        "windowName": {
+          "VarKey": null,
+          "Value": "Google Gemini - Google Chrome"
+        },
+        "procIdOrName": {
+          "VarKey": null,
+          "Value": "chrome"
+        },
+        "onlyVisible": {
+          "VarKey": null,
+          "Value": "default"
+        },
+        "requireTitle": {
+          "VarKey": null,
+          "Value": "1"
+        },
+        "useRegex": {
+          "VarKey": null,
+          "Value": "0"
+        },
+        "winRectIncludeInvisibleBorder": {
+          "VarKey": null,
+          "Value": "0"
+        },
+        "stopIfFail": {
+          "VarKey": null,
+          "Value": "1"
+        }
+      },
+      "OutputParams": {
+        "isSuccess": null,
+        "output": null,
+        "className": null,
+        "handle": "geminiHwnd",
+        "pid": null,
+        "procName": null,
+        "path": null,
+        "parent": null,
+        "root": null,
+        "rootOwner": null,
+        "rect": null,
+        "rectNoSize": null,
+        "rectDict": null,
+        "isTopmost": null,
+        "isVisible": null,
+        "showState": null,
+        "alpha": null,
+        "borderColor": null,
+        "allChildWindows": null,
+        "errMessage": null
+      },
+      "IfSteps": null,
+      "ElseSteps": null,
+      "Note": "",
+      "Disabled": false,
+      "Collapsed": false,
+      "DelayMs": 0
+    },
+    {
+      "StepRunnerKey": "sys:windowOperations",
+      "InputParams": {
+        "type": {
+          "VarKey": null,
+          "Value": "SET_FOREGROUND"
+        },
+        "hWnd": {
+          "VarKey": null,
+          "Value": "$= {geminiHwnd}"
+        },
+        "stopIfFail": {
+          "VarKey": null,
+          "Value": "1"
+        }
+      },
+      "OutputParams": {
+        "isSuccess": null,
+        "errMessage": null
+      },
+      "IfSteps": null,
+      "ElseSteps": null,
+      "Note": "",
+      "Disabled": false,
+      "Collapsed": false,
+      "DelayMs": 0
+    },
+    {
+      "StepRunnerKey": "sys:chromecontrol",
+      "InputParams": {
+        "operation": {
+          "VarKey": null,
+          "Value": "SetBrowser"
+        },
+        "browser": {
+          "VarKey": null,
+          "Value": "chrome"
+        },
+        "stopIfFail": {
+          "VarKey": null,
+          "Value": "1"
+        },
+        "mainProcessId": {
+          "VarKey": null,
+          "Value": "0"
+        },
+        "envName": {
+          "VarKey": null,
+          "Value": "*"
+        }
+      },
+      "OutputParams": {
+        "isSuccess": null,
+        "rawResponse": null,
+        "errMessage": null
+      },
+      "IfSteps": null,
+      "ElseSteps": null,
+      "Note": "",
+      "Disabled": false,
+      "Collapsed": false,
+      "DelayMs": 0
+    },
+    {
+      "StepRunnerKey": "sys:chromecontrol",
+      "InputParams": {
+        "operation": {
+          "VarKey": null,
+          "Value": "RunScript"
+        },
+        "tabId": {
+          "VarKey": null,
+          "Value": ""
+        },
+        "script": {
+          "VarKey": null,
+          "Value": "(() => {\r\n    function findGeminiInput() {\r\n        const els = [...document.querySelectorAll(\r\n            '[contenteditable=\"true\"], [role=\"textbox\"]'\r\n        )].filter(el => {\r\n            if (!el.isContentEditable) return false;\r\n\r\n            const r = el.getBoundingClientRect();\r\n            const s = getComputedStyle(el);\r\n\r\n            return (\r\n                r.width > 200 &&\r\n                r.height > 20 &&\r\n                r.bottom > window.innerHeight * 0.55 &&\r\n                r.top < window.innerHeight &&\r\n                s.display !== 'none' &&\r\n                s.visibility !== 'hidden'\r\n            );\r\n        });\r\n\r\n        els.sort(\r\n            (a, b) =>\r\n                b.getBoundingClientRect().bottom -\r\n                a.getBoundingClientRect().bottom\r\n        );\r\n\r\n        return els[0];\r\n    }\r\n\r\n    const el = findGeminiInput();\r\n\r\n    if (!el) {\r\n        throw new Error('未找到 Gemini 输入框');\r\n    }\r\n\r\n    el.focus();\r\n\r\n    const range = document.createRange();\r\n    range.selectNodeContents(el);\r\n\r\n    const sel = window.getSelection();\r\n    sel.removeAllRanges();\r\n    sel.addRange(range);\r\n\r\n    document.execCommand('delete');\r\n\r\n    el.dispatchEvent(new InputEvent('input', {\r\n        bubbles: true,\r\n        inputType: 
