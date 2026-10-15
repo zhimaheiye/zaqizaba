@@ -6,7 +6,7 @@ description: |
   适用场景：与 GPT 联合调试、让 GPT 审查代码/截图、向 GPT 汇报工作进度或请求设计建议。
   使用前提：浏览器中已打开 ChatGPT 对话页面，Kimi WebBridge 插件已安装并运行。
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
   tested_on: "chatgpt.com"
 ---
 
@@ -113,9 +113,47 @@ Remove-Item -Path $path -ErrorAction SilentlyContinue
 
 ---
 
-## 3. 向 GPT 发送文本消息（fill + 点击发送）
+## 3. 向 GPT 发送文本消息
 
-### 3a. 填写消息内容（`fill` 动作）
+### 3a. 【推荐】固定 CLI：`tools/chatgpt-handoff/send_to_chatgpt.py`（CDP 可信输入）
+
+> [!IMPORTANT]
+> ChatGPT 的输入框是 **Lexical 编辑器**，会忽略一切合成输入。
+> 下方 3b 的 `fill` + `execCommand('insertText')` 方式在本机实测会让 DOM 显示文字但
+> Lexical 内部状态为空、发送按钮永不激活——**不要再用它们发送正文**，图片注入（第 4 节）不受影响。
+>
+> 唯一可靠的路径是 WebBridge 官方 `cdp` 动作的 `Input.insertText`（浏览器级可信输入）。
+> 本仓库已将其封装为固定 CLI，Agent 不必再摸索页面结构：
+
+```bash
+# 仅验证（不动正式对话草稿）：在 agent 专属 session 的标签上输入测试文本，
+# 确认发送按钮激活后自动清空草稿，不发送
+python tools/chatgpt-handoff/send_to_chatgpt.py \
+    --url "https://chatgpt.com/c/<conversation-id>" \
+    --message-file msg.txt --dry-run
+
+# 实际发送（先验证发送按钮已启用，再点击发送；不使用 Enter 提交）
+python tools/chatgpt-handoff/send_to_chatgpt.py \
+    --url "https://chatgpt.com/c/<conversation-id>" \
+    --message-file msg.txt --send
+```
+
+行为约定：
+
+| 项 | 说明 |
+| :--- | :--- |
+| 标签定位 | 只用 agent 专属 session（默认 `chatgpt-handoff`，标签组 `agent:chatgpt-handoff`），`list_tabs` 命中同对话则复用，否则 `navigate` 新开；**绝不借用用户正在看的标签** |
+| 草稿保护 | composer 已有草稿（len>2）时直接拒绝执行，不覆盖用户未发送内容 |
+| 输入方式 | `Emulation.setFocusEmulationEnabled` + `cdp Input.insertText`（UTF-8），结束后自动关闭 focus emulation |
+| 发送按钮 | 兼容无 `data-testid` 的新版结构：`form button[type=submit]` + `aria-label 发送/Send`，显式排除 停止/听写/语音 |
+| 成功判定 | `--send` 以 transcript 出现新的用户回合（`[data-testid^="conversation-turn-"]` 数量增加或出现 streaming）为准，**不依据 composer DOM 变化** |
+| UNKNOWN 语义 | 点击后 20 秒内确认不到新回合 → 退出码 3 + `status: UNKNOWN`，**不得自动重发**（ChatGPT 有“消息已入 transcript 但不生成回复”的已知怪癖，重发会造成重复消息） |
+| 退出码 | `0` OK/SENT；`2` FAILED；`3` UNKNOWN |
+| 多行文本 | 安全：走 `Input.insertText`，不派发 Enter，`\n` 由 Lexical 转为段落 |
+
+实测记录（2026-10-16，主力机 Edge）：dry-run 两次全部通过——文本以标准 Lexical 段落（`<p>`）进入编辑器、发送按钮激活、清理后归零。`--send` 分支与 transcript 确认逻辑同批交付，**发送功能尚未实测**，首次真实发送时按 UNKNOWN 语义人工确认。
+
+### 3b. 【已知失效】fill + 点击发送（仅作历史参考）
 
 ChatGPT 的输入框是 `[contenteditable]` 富文本容器，selector 为 `#prompt-textarea`。
 
@@ -147,9 +185,11 @@ curl.exe -s -X POST http://127.0.0.1:10086/command -H "Content-Type: application
 > [!IMPORTANT]
 > **中文 / 多字节内容必须用 Python 写 JSON**，不能用 PowerShell Here-String 直接写，否则非 ASCII 字符会被截断为 `?`。
 >
-> `fill` 的返回 `{"ok":true,"data":{"mode":"contenteditable",...}}` 说明成功注入富文本。
+> `fill` 的返回 `{"ok":true,"data":{"mode":"contenteditable",...}}` 只说明文本进了 DOM。
+> **实测 Lexical 不会登记合成输入**：此时发送按钮不出现，直接提交会把空消息发出去或什么也不发生。
+> 发送正文请改用 3a 的 CLI。
 
-### 3b. 点击发送按钮
+### 3c. 点击发送按钮（历史参考，配合 3b 属已知失效路径）
 
 ```powershell
 $js = @"
@@ -176,7 +216,8 @@ Remove-Item -Path $path -ErrorAction SilentlyContinue
 ```
 
 > [!TIP]
-> 若 `fill` 成功但 send-button 找不到，说明 GPT 有时渲染了 `#composer-submit-button`；上方代码已同时覆盖两个选择器，优先使用 `data-testid="send-button"`。
+> 新版 ChatGPT 的发送按钮**没有** `data-testid`，真实结构是 `form button[type=submit]` +
+> `aria-label="发送"`（流式输出期间同一位置会变成停止按钮）。3a 的 CLI 已内置该查找逻辑。
 
 ---
 
@@ -287,6 +328,10 @@ Remove-Item -Path $path -ErrorAction SilentlyContinue
 ---
 
 ## 6. 完整流程示例（Python 版，推荐）
+
+> [!WARNING]
+> 下例 `send_to_gpt` 使用 `fill`，对当前 Lexical 编辑器**已失效**（见第 3 节），仅 `wait_for_gpt_reply` 仍可用；
+> 发送请改用 `tools/chatgpt-handoff/send_to_chatgpt.py`。
 
 将发送文字 + 读取回复集成为辅助函数：
 
