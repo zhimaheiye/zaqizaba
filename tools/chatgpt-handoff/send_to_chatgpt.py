@@ -194,13 +194,25 @@ def send_click(session):
     return result or {}
 
 
-def turn_stats(session):
+def turn_stats(session, marker):
+    # Current ChatGPT builds render messages without article tags,
+    # data-message-id or conversation-turn-* testids, so confirm from
+    # DOM-agnostic signals: composer emptied + the message text showing up
+    # in the transcript (main.innerText), or streaming indicators.
     return evaluate("""(() => {
-      const turns = document.querySelectorAll('[data-testid^="conversation-turn-"]');
+      const m = document.querySelector('main');
+      const c = document.querySelector('%s') || document.querySelector('form [contenteditable="true"]');
       const streaming = !!document.querySelector('.result-streaming')
                      || !!document.querySelector('[data-testid="stop-button"]');
-      return JSON.stringify({count: turns.length, streaming: streaming});
-    })()""", session)
+      const mainText = m ? m.innerText : '';
+      const composerText = c ? c.innerText : '';
+      return JSON.stringify({
+        streaming: streaming,
+        composerLen: composerText.trim().length,
+        markerInMain: mainText.indexOf(%s) >= 0,
+        mainLen: mainText.length
+      });
+    })()""" % (COMPOSER_SEL, json.dumps(marker)), session)
 
 
 def main():
@@ -250,42 +262,47 @@ def main():
             result["steps"]["cleanup"] = {"composer_len_after_clear": leftover}
             result["status"] = "OK"
             result["note"] = "dry-run: text accepted by Lexical, send button active; draft cleared; nothing sent"
-            print(json.dumps(result, ensure_ascii=True, indent=2))
+            print(json.dumps(result, ensure_ascii=True, indent=2), flush=True)
             sys.exit(0)
 
-        before = turn_stats(args.session) or {}
+        marker = max(text.splitlines(), key=len).strip()[:40] if text.strip() else ""
+        before = turn_stats(args.session, marker) or {}
         clicked = send_click(args.session)
         result["steps"]["click"] = clicked
         if not clicked.get("clicked"):
             result["status"] = "UNKNOWN"
             result["error"] = "send button click did not go through: %s" % clicked.get("reason")
+            print(json.dumps(result, ensure_ascii=True, indent=2), flush=True)
             sys.exit(3)
 
         deadline = time.time() + 20
         confirmed = False
+        now = before
         while time.time() < deadline:
             time.sleep(2)
-            now = turn_stats(args.session) or {}
-            if now.get("count", 0) > before.get("count", 0) or now.get("streaming"):
+            now = turn_stats(args.session, marker) or {}
+            if now.get("streaming") or (now.get("composerLen", 99) <= 2 and now.get("markerInMain")):
                 confirmed = True
                 break
         result["steps"]["confirm"] = {
-            "turns_before": before.get("count"),
-            "streaming": (turn_stats(args.session) or {}).get("streaming"),
-            "new_user_turn": confirmed,
+            "marker": marker,
+            "mainLen_before": before.get("mainLen"),
+            "mainLen_after": now.get("mainLen"),
+            "streaming": now.get("streaming"),
+            "markerInMain": now.get("markerInMain"),
+            "composerLen": now.get("composerLen"),
         }
         result["status"] = "SENT" if confirmed else "UNKNOWN"
         if not confirmed:
             result["error"] = "no new conversation turn appeared within 20s; do NOT retry automatically"
-            sys.exit(3)
-        print(json.dumps(result, ensure_ascii=True, indent=2))
-        sys.exit(0)
+        print(json.dumps(result, ensure_ascii=True, indent=2), flush=True)
+        sys.exit(0 if confirmed else 3)
 
     except SystemExit as e:
         raise
     except Exception as e:
         result["error"] = str(e)
-        print(json.dumps(result, ensure_ascii=True, indent=2))
+        print(json.dumps(result, ensure_ascii=True, indent=2), flush=True)
         sys.exit(2)
     finally:
         if emulation_on:

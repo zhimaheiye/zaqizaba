@@ -146,12 +146,12 @@ python tools/chatgpt-handoff/send_to_chatgpt.py \
 | 草稿保护 | composer 已有草稿（len>2）时直接拒绝执行，不覆盖用户未发送内容 |
 | 输入方式 | `Emulation.setFocusEmulationEnabled` + `cdp Input.insertText`（UTF-8），结束后自动关闭 focus emulation |
 | 发送按钮 | 兼容无 `data-testid` 的新版结构：`form button[type=submit]` + `aria-label 发送/Send`，显式排除 停止/听写/语音 |
-| 成功判定 | `--send` 以 transcript 出现新的用户回合（`[data-testid^="conversation-turn-"]` 数量增加或出现 streaming）为准，**不依据 composer DOM 变化** |
+| 成功判定 | `--send` 以 DOM 无关信号确认：composer 清空 + 消息标记文本出现在 transcript（`main.innerText`），或出现 streaming/stop 按钮。新版 ChatGPT 渲染已无 `article`、`data-message-id`、`conversation-turn-*`，**不要用这些选择器确认** |
 | UNKNOWN 语义 | 点击后 20 秒内确认不到新回合 → 退出码 3 + `status: UNKNOWN`，**不得自动重发**（ChatGPT 有“消息已入 transcript 但不生成回复”的已知怪癖，重发会造成重复消息） |
 | 退出码 | `0` OK/SENT；`2` FAILED；`3` UNKNOWN |
 | 多行文本 | 安全：走 `Input.insertText`，不派发 Enter，`\n` 由 Lexical 转为段落 |
 
-实测记录（2026-10-16，主力机 Edge）：dry-run 两次全部通过——文本以标准 Lexical 段落（`<p>`）进入编辑器、发送按钮激活、清理后归零。`--send` 分支与 transcript 确认逻辑同批交付，**发送功能尚未实测**，首次真实发送时按 UNKNOWN 语义人工确认。
+实测记录（2026-10-16，主力机 Edge）：dry-run 两次全部通过——文本以标准 Lexical 段落（`<p>`）进入编辑器、发送按钮激活、清理后归零。`--send` 已对正式对话完成首次端到端实测：消息送达且 ChatGPT 正常回复；首跑曾因旧版回合选择器失效误报 UNKNOWN，确认逻辑已改为 DOM 无关方案并复验。
 
 ### 3b. 【已知失效】fill + 点击发送（仅作历史参考）
 
